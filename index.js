@@ -1,7 +1,9 @@
 const express = require('express');
 const app = express();
 const morgan = require('morgan');
+const cors = require('cors');
 
+app.use(cors());
 app.use(express.json());
 
 morgan.token('body', (req, res) => (req.method == 'POST') ? JSON.stringify(req.body) : "");
@@ -59,9 +61,11 @@ const getValidationError = entry => {
     return false;
 };
 
-app.get('/api/persons', (req, res) => res.json(phonebook.persons));
+const BASE_URL = '/api/persons/';
 
-app.get('/api/persons/:id', (req, res) => {
+app.get(BASE_URL, (req, res) => res.json(phonebook.persons));
+
+app.get(`${BASE_URL}:id`, (req, res) => {
     const id = Number(req.params.id);
 
     const person = phonebook.persons.find((entry) => entry.id === id);
@@ -73,7 +77,7 @@ app.get('/api/persons/:id', (req, res) => {
     }
 });
 
-app.post('/api/persons', (req, res) => {
+app.post(BASE_URL, (req, res) => {
     const entry = {...req.body};
     const validationError = getValidationError(entry);
 
@@ -94,7 +98,7 @@ app.post('/api/persons', (req, res) => {
     res.json(entry);
 });
 
-app.delete('/api/persons/:id', (req, res) => {
+app.delete(`${BASE_URL}:id`, (req, res) => {
     const id = Number(req.params.id);
 
     phonebook.persons = phonebook.persons.filter((entry) => entry.id != id);
@@ -118,7 +122,7 @@ const unknownEndpoint = (request, response) =>
   
 app.use(unknownEndpoint)
 
-const PORT = 3001;
+const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
 });
