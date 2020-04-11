@@ -1,11 +1,12 @@
+require('dotenv').config();
+
 const express = require('express');
 const app = express();
 const morgan = require('morgan');
-const cors = require('cors');
+const Entry = require('./models/entry');
 
-app.use(cors());
-app.use(express.json());
 app.use(express.static('build'))
+app.use(express.json());
 
 morgan.token('body', (req, res) => (req.method == 'POST') ? JSON.stringify(req.body) : "");
 app.use(morgan(function (tokens, req, res) {
@@ -19,109 +20,102 @@ app.use(morgan(function (tokens, req, res) {
     ].join(' ')
   }));
 
-const phonebook = 
-    {
-        "persons": [
-        {
-            "name": "Arto Hellas",
-            "number": "040-123456",
-            "id": 1
-        },
-        {
-            "name": "Ada Lovelace",
-            "number": "39-44-5323523",
-            "id": 2
-        },
-        {
-            "name": "Dan Abramov",
-            "number": "12-43-234345",
-            "id": 3
-        },
-        {
-            "name": "Mary Poppendieck",
-            "number": "39-23-6423122",
-            "id": 4
-        }
-        ]
-    };
-
-const MAX_ID = 1000000;
-const generateId = usedIds => {
-    while (true) {
-        const newId = Math.floor(Math.random() * MAX_ID) + 1;
-
-        if (!usedIds[newId]) return newId;
-    }
-};
-
 const getValidationError = entry => {
-    if (!entry.name) return 'name is required';
-    if (!entry.number) return 'number is required';
-    if (phonebook.persons.find(({name}) => entry.name === name)) return `name ${entry.name} already exists`;
-
-    return false;
+    if (!entry.name) return new Promise().resolve('name is required');
+    if (!entry.number) return new Promise().resolve('number is required');
+    return Entry.findOne({name: { "$eq": entry.name }})
+        .then(entry => {
+            if (entry === null) return false;
+            return `name ${entry.name} already exists`;
+        });
 };
 
 const BASE_URL = '/api/persons/';
 
-app.get(BASE_URL, (req, res) => res.json(phonebook.persons));
+app.get(BASE_URL, (req, res) => {
+    Entry.find({})
+        .then(entries => {
+            console.log(entries);
+            res.json(entries);
+        })
+        .catch(error => console.log(error.message));
+});
 
-app.get(`${BASE_URL}:id`, (req, res) => {
-    const id = Number(req.params.id);
+app.get(`${BASE_URL}:id`, (req, res, next) => {
+    const id = req.params.id;
 
-    const person = phonebook.persons.find((entry) => entry.id === id);
-
-    if (!person) {
-        res.status(404).end();
-    } else {
-        res.json(person);
-    }
+    Entry.findById(id)
+        .then(entry => {
+            if (entry === null) {
+                res.status(404).end();
+            } else {
+                res.json(entry);
+            }
+        })
+        .catch(error => next(error));
 });
 
 app.post(BASE_URL, (req, res) => {
-    const entry = {...req.body};
-    const validationError = getValidationError(entry);
+    const {name, number} = {...req.body};
+    getValidationError({name, number})
+        .then(error => {
+            if (error) {
+                res.status(400).json({ error: validationError});
+                return;
+            }
+        
+            const entry = new Entry({ name, number });
 
-    if (validationError) {
-        res.status(400).json({ error: validationError});
-        return;
-    }
+            entry.save()
+                .then(savedEntry => {
+                    res.json(savedEntry);
+                })
+                .catch(error => {
+                    console.log(error.message);
+                    res.status(500).end();
+                });
+        })
 
-    entry.id = generateId(phonebook.persons.reduce(
-        (used, entry) => {
-            used[entry.id] = true;
-            return used;
-        },
-    {}));
-
-    phonebook.persons.push(entry);
-
-    res.json(entry);
 });
 
 app.delete(`${BASE_URL}:id`, (req, res) => {
-    const id = Number(req.params.id);
+    const id = req.params.id;
 
-    phonebook.persons = phonebook.persons.filter((entry) => entry.id != id);
-
-    res.status(204).end();
+    Entry.deleteOne({ _id : { "$eq": id}})
+        .then(response => res.status(204).end())
+        .catch(error => res.status(500).send(JSON.stringify(error)).end());
 });
 
 app.get('/info', (req, res) => {
-    const countPersonsInfo = 
-        `<p>Phonebook has info for ${phonebook.persons.length} people</p>`;
-    const timestampInfo = 
-        `<p>${new Date()}</p>`;
-
-        res.end(`<div>${countPersonsInfo}${timestampInfo}</div>`);
+    Entry.estimatedDocumentCount()
+        .then(count => {
+            const countPersonsInfo = 
+                `<p>Phonebook has info for ${count} people</p>`;
+            const timestampInfo = 
+                `<p>${new Date()}</p>`;
+    
+            res.end(`<div>${countPersonsInfo}${timestampInfo}</div>`);
+        })
+        .catch(error => res.status(500).send(error.message).end());
 });
 
-const unknownEndpoint = (request, response) => 
-    {
-        response.status(404).send({ error: 'unknown endpoint' });
-    }
+const unknownEndpoint = (request, response) => {
+    response.status(404).send({ error: 'unknown endpoint' });
+};
   
 app.use(unknownEndpoint)
+
+const errorHandler = (error, req, res, next) => {
+    console.error(error.message);
+
+    if (error.name === 'CastError' && error.kind === 'ObjectId') {
+        return res.status(400).send({ error: 'malformatted id' });
+    } 
+
+    next(error);
+};
+    
+app.use(errorHandler);
 
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
