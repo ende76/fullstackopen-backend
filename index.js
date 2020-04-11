@@ -5,20 +5,20 @@ const app = express();
 const morgan = require('morgan');
 const Entry = require('./models/entry');
 
-app.use(express.static('build'))
+app.use(express.static('build'));
 app.use(express.json());
 
-morgan.token('body', (req, res) => (req.method === 'POST' || req.method === 'PUT') ? JSON.stringify(req.body) : "");
+morgan.token('body', req => (req.method === 'POST' || req.method === 'PUT') ? JSON.stringify(req.body) : '');
 app.use(morgan(function (tokens, req, res) {
     return [
-      tokens.method(req, res),
-      tokens.url(req, res),
-      tokens.status(req, res),
-      tokens.res(req, res, 'content-length'), '-',
-      tokens['response-time'](req, res), 'ms',
-      tokens.body(req, res),
-    ].join(' ')
-  }));
+        tokens.method(req, res),
+        tokens.url(req, res),
+        tokens.status(req, res),
+        tokens.res(req, res, 'content-length'), '-',
+        tokens['response-time'](req, res), 'ms',
+        tokens.body(req, res),
+    ].join(' ');
+}));
 
 const BASE_URL = '/api/persons/';
 
@@ -43,7 +43,7 @@ app.get(`${BASE_URL}:id`, (req, res, next) => {
 });
 
 app.post(BASE_URL, (req, res, next) => {
-    const {name, number} = req.body;
+    const { name, number } = req.body;
     const entry = new Entry({ name, number });
 
     entry.save()
@@ -53,7 +53,7 @@ app.post(BASE_URL, (req, res, next) => {
 
 app.put(`${BASE_URL}:id`, (req, res, next) => {
     const id = req.params.id;
-    const {name, number} = req.body;
+    const { name, number } = req.body;
     const entryData = { name, number };
 
     Entry.findByIdAndUpdate(id, entryData, { new: true, runValidators: true, context: 'query' })
@@ -69,19 +69,19 @@ app.put(`${BASE_URL}:id`, (req, res, next) => {
 app.delete(`${BASE_URL}:id`, (req, res, next) => {
     const id = req.params.id;
 
-    Entry.deleteOne({ _id : { "$eq": id}})
-        .then(response => res.status(204).end())
+    Entry.deleteOne({ _id : { '$eq': id } })
+        .then(res => res.status(204).end())
         .catch(error => next(error));
 });
 
-app.get('/info', (req, res) => {
+app.get('/info', (req, res, next) => {
     Entry.estimatedDocumentCount()
         .then(count => {
-            const countPersonsInfo = 
+            const countPersonsInfo =
                 `<p>Phonebook has info for ${count} people</p>`;
-            const timestampInfo = 
+            const timestampInfo =
                 `<p>${new Date()}</p>`;
-    
+
             res.end(`<div>${countPersonsInfo}${timestampInfo}</div>`);
         })
         .catch(error => next(error));
@@ -90,24 +90,24 @@ app.get('/info', (req, res) => {
 const unknownEndpoint = (request, response) => {
     response.status(404).send({ error: 'unknown endpoint' });
 };
-  
-app.use(unknownEndpoint)
+
+app.use(unknownEndpoint);
 
 const errorHandler = (error, req, res, next) => {
     console.error(error.name, error.message);
 
     switch (error.name) {
-        case 'ValidationError':
-            return res.status(400).send({ message: error.message });
-        case 'CastError':
-            return res.status(400).send({ message: 'malformed id' });
-        default:
-            break;
+    case 'ValidationError':
+        return res.status(400).send({ message: error.message });
+    case 'CastError':
+        return res.status(400).send({ message: 'malformed id' });
+    default:
+        break;
     }
 
     next(error);
 };
-    
+
 app.use(errorHandler);
 
 const PORT = process.env.PORT || 3001;

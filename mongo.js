@@ -2,12 +2,12 @@ const mongoose = require('mongoose');
 
 const USAGE = 'Usage: node mongo.js <password> [<name> <number>]';
 
-if (!(process.argv.length == 3 || process.argv.length == 5)) {
+if (!(process.argv.length === 3 || process.argv.length === 5)) {
     console.log(USAGE);
     process.exit(1);
 }
 
-const createNewEntry = process.argv.length == 5;
+const createNewEntry = process.argv.length === 5;
 
 const [password, name, number] = process.argv.slice(2);
 
@@ -15,7 +15,7 @@ const url = `mongodb+srv://fullstack:${password}@cluster0-vgoo7.mongodb.net/phon
 
 mongoose
     .connect(url, { useNewUrlParser: true, useUnifiedTopology: true })
-    .then(response => console.log('connection established'))
+    .then(() => console.log('connection established'))
     .catch(error => {
         console.log('connection failed', error.message);
         process.exit(1);
@@ -30,9 +30,9 @@ const Entry = mongoose.model('Entry', entrySchema);
 
 if (createNewEntry) {
     const entry = new Entry({ name, number });
-    
+
     entry.save()
-        .then(response => {
+        .then(() => {
             console.log('entry saved!');
             mongoose.connection.close();
         })
@@ -43,7 +43,7 @@ if (createNewEntry) {
 } else {
     Entry.find({})
         .then(result => {
-            console.log("phonebook:");
+            console.log('phonebook:');
             result.forEach(entry => console.log(entry.name, entry.number));
             mongoose.connection.close();
         })
