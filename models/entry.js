@@ -1,21 +1,6 @@
 const mongoose = require('mongoose');
 const uniqueValidator = require('mongoose-unique-validator');
 
-const url = process.env.MONGODB_URI;
-
-mongoose
-    .connect(url, {
-        useCreateIndex: true,
-        useFindAndModify: false,
-        useNewUrlParser: true,
-        useUnifiedTopology: true,
-    })
-    .then(() => console.log('mongoDB connection established'))
-    .catch(error => {
-        console.log('mongoDB connection failed', error.message);
-        process.exit(1);
-    });
-
 const entrySchema = new mongoose.Schema({
     name: {
         type: String,
